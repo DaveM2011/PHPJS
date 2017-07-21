@@ -5,7 +5,7 @@
 #include "duktape.h"
 #include "php_phpjs.h"
 
-int phpjs_php__call(duk_context * ctx, char * fnc, zval * a_args, zval * return_value TSRMLS_DC)
+void phpjs_php__call(duk_context * ctx, char * fnc, zval * a_args, zval * return_value TSRMLS_DC)
 {
     duk_get_prop_string(ctx, -1, fnc);
 
@@ -24,40 +24,40 @@ int phpjs_php__call(duk_context * ctx, char * fnc, zval * a_args, zval * return_
         duk_php_throw(ctx, -1 TSRMLS_CC);
         RETURN_FALSE;
     }
-    duk_to_zval(&return_value, ctx, -1);
+    duk_to_zval(return_value, ctx, -1);
     php_duk_free_return(ctx);
 }
 
 int zval_array_to_stack(duk_context * ctx, zval * a_args)
 {
     int argc = 0;
-    zval ** data;
+    zval * data;
     HashTable *myht = Z_ARRVAL_P(a_args);
-    
-    for (zend_hash_internal_pointer_reset(myht);
-            zend_hash_get_current_data(myht, (void **) &data) == SUCCESS;
-            zend_hash_move_forward(myht)
-        ) {
-        zval_to_duk(ctx, NULL, *data);
-        argc++;
-    }
+
+	ZEND_HASH_FOREACH_VAL(myht, data)
+		zval_to_duk(ctx, NULL, data);
+		argc++;
+	ZEND_HASH_FOREACH_END();
 
     return argc;
 }
 
-void phpjs_wrapped_free(phpjs_wrap_duk_t * obj TSRMLS_DC)
+void phpjs_wrapped_free(zend_object * object TSRMLS_DC)
 {
-    zend_object_std_dtor(&obj->zo TSRMLS_CC);
+	phpjs_wrap_duk_t *obj;
+    obj = (phpjs_wrap_duk_t *)((char *)object - XtOffsetOf(phpjs_wrap_duk_t, zobj));
+
+    zend_object_std_dtor(&obj->zobj TSRMLS_CC);
     if (obj->vm) {
         duk_to_undefined(obj->ctx, obj->idx);
-        zval_ptr_dtor(&obj->vm);
+        zval_ptr_dtor(obj->vm);
     }
     efree(obj);
 }
 
 void phpjs_add_duk_context(zval * this, duk_context * ctx, duk_idx_t idx TSRMLS_DC)
 {
-    phpjs_wrap_duk_t * obj = (phpjs_wrap_duk_t *) zend_object_store_get_object(this TSRMLS_CC );   
+    phpjs_wrap_duk_t * obj = (phpjs_wrap_duk_t *) ((char*)this - XtOffsetOf(phpjs_wrap_duk_t, zobj));   
     duk_memory_functions mem;
     duk_get_memory_functions(ctx, &mem);
     obj->vm  = mem.udata;

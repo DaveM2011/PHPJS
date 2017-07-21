@@ -11,6 +11,9 @@ duk_ret_t duk_php_print(duk_context * ctx)
     int i;
 
     for (i = 0; i < args; i++) {
+		//duk_int_t t = duk_get_type(ctx, i);
+		//if (t == DUK_TYPE_UNDEFINED || t == DUK_TYPE_NONE)
+			//continue;
         php_printf(i == args - 1 ? "%s\n" : "%s ", duk_safe_to_string( ctx, i ));
     }
 
@@ -19,30 +22,24 @@ duk_ret_t duk_php_print(duk_context * ctx)
     return 1;
 }
 
-
 void duk_php_init(duk_context * ctx)
 {
     duk_push_global_object(ctx);
     duk_push_c_function(ctx, duk_php_print, DUK_VARARGS);
     duk_put_prop_string(ctx, -2, "print");
-    duk_pop(ctx);
+    //duk_pop(ctx);
 
-    duk_push_global_object(ctx);
+    //duk_push_global_object(ctx);
     duk_push_c_function(ctx, duk_set_into_php, DUK_VARARGS);
     duk_put_prop_string(ctx, -2, "__set_into_php");
-    duk_pop(ctx);
+    //duk_pop(ctx);
 
-    duk_push_global_object(ctx);
+    //duk_push_global_object(ctx);
     duk_push_c_function(ctx, duk_get_from_php, DUK_VARARGS);
     duk_put_prop_string(ctx, -2, "__get_from_php");
     duk_pop(ctx);
 
-    duk_push_string(ctx, "var $PHP = new Proxy({}, {       " \
-        "set: __set_into_php,                                   " \
-        "get: __get_from_php,                                   " \
-        "});                                                    " \
-        "var PHP = $PHP;                                        " 
-    );
+    duk_push_string(ctx, "var PHP=new Proxy({},{set:__set_into_php,get:__get_from_php});");
 
     if (duk_peval(ctx) != 0) {
         printf("eval failed: %s\n", duk_safe_to_string(ctx, -1));
@@ -55,7 +52,7 @@ void duk_php_throw(duk_context * ctx, duk_idx_t idx TSRMLS_DC)
 {
     char * js_stack, * message;
     zval * tc_ex;
-    MAKE_STD_ZVAL(tc_ex);
+    //MAKE_STD_ZVAL(tc_ex);
     object_init_ex(tc_ex, phpjs_JSException_ptr);
 
 
@@ -79,29 +76,23 @@ void zval_to_duk(duk_context * ctx, char * name, zval * value)
 {
     switch (Z_TYPE_P(value)) {
     case IS_ARRAY: {
-        zval ** data;
+        zval * data;
         HashTable *myht = Z_ARRVAL_P(value);
-        char *str_index;
-        uint str_length;
-        ulong num_index;
+        zend_string *str_index;
+        zend_ulong str_length;
+        zend_ulong num_index;
+		
         duk_idx_t arr_idx = duk_push_php_array_or_object(ctx, myht);
 
-
-        for (zend_hash_internal_pointer_reset(myht);
-               zend_hash_get_current_data(myht, (void **) &data) == SUCCESS;
-               zend_hash_move_forward(myht)
-           ) {
-            zval_to_duk(ctx, NULL, *data);
-            switch (zend_hash_get_current_key_ex(myht, &str_index, &str_length, &num_index, 0, NULL)) {
-            case HASH_KEY_IS_LONG:
-                duk_put_prop_index(ctx, arr_idx, num_index);
-                break;
-            case HASH_KEY_IS_STRING:
-                duk_put_prop_string(ctx, arr_idx, str_index);
-                break;
-            }
-
-        }
+		ZEND_HASH_FOREACH_KEY_VAL(myht, num_index, str_index, data)
+			zval_to_duk(ctx, NULL, data);
+			if (str_index) { //HASH_KEY_IS_STRING
+				duk_put_prop_string(ctx, arr_idx, ZSTR_VAL(str_index));
+			} else {
+				duk_put_prop_index(ctx, arr_idx, num_index);
+			}
+		ZEND_HASH_FOREACH_END();
+		
         break;
     }
     case IS_STRING:
@@ -114,7 +105,7 @@ void zval_to_duk(duk_context * ctx, char * name, zval * value)
         duk_push_number(ctx, Z_DVAL_P(value));
         break;
     case IS_BOOL:
-        if (Z_BVAL_P(value)) {
+        if (Z_TYPE_P(value) == IS_TRUE || (Z_TYPE_P(value) == IS_LONG && Z_LVAL_P(value))) {
             duk_push_true(ctx);
         } else {
             duk_push_false(ctx);
@@ -123,6 +114,9 @@ void zval_to_duk(duk_context * ctx, char * name, zval * value)
     case IS_NULL:
         duk_push_false(ctx);
         break;
+	default:
+		duk_push_undefined(ctx);
+		break;
     }
 
     if (name) {
@@ -134,21 +128,16 @@ void zval_to_duk(duk_context * ctx, char * name, zval * value)
 
 duk_idx_t duk_push_php_array_or_object(duk_context * ctx, HashTable * myht)
 {
-    char *str_index;
-    uint str_length;
-    ulong num_index;
-    zval ** data;
+    zend_string *str_index;
+    zend_ulong str_length;
+    zend_ulong num_index;
 
-    for (zend_hash_internal_pointer_reset(myht);
-            zend_hash_get_current_data(myht, (void **) &data) == SUCCESS;
-            zend_hash_move_forward(myht)
-        ) {
-        switch (zend_hash_get_current_key_ex(myht, &str_index, &str_length, &num_index, 0, NULL)) {
-        case HASH_KEY_IS_STRING:
-            return duk_push_object(ctx);
-        }
-    }
-
+	ZEND_HASH_FOREACH_KEY(myht, num_index, str_index)
+		if (str_index) { //HASH_KEY_IS_STRING
+			return duk_push_object(ctx);
+		}
+	ZEND_HASH_FOREACH_END();
+    
     return duk_push_array(ctx);
 }
 
@@ -168,28 +157,28 @@ static int duk_is_php_object(duk_context * ctx, duk_idx_t idx)
     return cmp != 0;
 }
 
-void duk_to_zval(zval ** var, duk_context * ctx, duk_idx_t idx)
+void duk_to_zval(zval * var, duk_context * ctx, duk_idx_t idx)
 {
     duk_size_t len;
-    char * str;
+    const char * str;
 
     switch (duk_get_type(ctx, idx)) {
     case DUK_TYPE_UNDEFINED:
     case DUK_TYPE_NULL:
     case DUK_TYPE_NONE:
-        ZVAL_NULL(*var);
+        ZVAL_NULL(var);
         break;
 
     case DUK_TYPE_OBJECT: {
         if (duk_is_function(ctx, idx)) {
             TSRMLS_FETCH();
-            object_init_ex(*var, phpjs_JSFunctionWrapper_ptr);
-            phpjs_add_duk_context(*var, ctx, idx TSRMLS_CC);
+            object_init_ex(var, phpjs_JSFunctionWrapper_ptr);
+            phpjs_add_duk_context(var, ctx, idx TSRMLS_CC);
             break;
         } else if (duk_is_php_object(ctx, idx)) {
             TSRMLS_FETCH();
-            object_init_ex(*var, phpjs_JSObjectWrapper_ptr);
-            phpjs_add_duk_context(*var, ctx, idx TSRMLS_CC);
+            object_init_ex(var, phpjs_JSObjectWrapper_ptr);
+            phpjs_add_duk_context(var, ctx, idx TSRMLS_CC);
             break;
         }
 
@@ -197,17 +186,17 @@ void duk_to_zval(zval ** var, duk_context * ctx, duk_idx_t idx)
         duk_idx_t idx1;
         duk_enum(ctx, idx, DUK_ENUM_OWN_PROPERTIES_ONLY);
         idx1 = duk_normalize_index(ctx, -1);
-        array_init(*var);
+        array_init(var);
 
         while (duk_next(ctx, idx1, 1 /*get_value*/)) {
-            zval * value;
-            MAKE_STD_ZVAL(value);
+            zval value;
+            //MAKE_STD_ZVAL(value);
             duk_to_zval(&value, ctx, -1);
 
             if(duk_get_type(ctx, -2) == DUK_TYPE_NUMBER) {
-                add_index_zval(*var, duk_get_number(ctx,-2), value);
+                add_index_zval(var, duk_get_number(ctx,-2), &value);
             } else {
-                add_assoc_zval(*var, duk_get_string(ctx, -2), value);
+                add_assoc_zval(var, duk_get_string(ctx, -2), &value);
             }
 
             duk_pop_2(ctx);  /* pop_key */
@@ -217,20 +206,20 @@ void duk_to_zval(zval ** var, duk_context * ctx, duk_idx_t idx)
     }
 
     case DUK_TYPE_NUMBER:
-        ZVAL_DOUBLE(*var, duk_get_number(ctx, idx));
+        ZVAL_DOUBLE(var, duk_get_number(ctx, idx));
         break;
 
     case DUK_TYPE_BOOLEAN:
         if (duk_get_number(ctx, idx)) {
-            ZVAL_TRUE(*var);
+            ZVAL_TRUE(var);
         } else {
-            ZVAL_FALSE(*var);
+            ZVAL_FALSE(var);
         }
         break;
 
     case DUK_TYPE_STRING:
         str = duk_get_lstring(ctx, idx, &len);
-        ZVAL_STRINGL(*var, str, len,  1);
+		ZVAL_STRINGL(var, str, len);
         break;
     }
 }
@@ -238,35 +227,42 @@ void duk_to_zval(zval ** var, duk_context * ctx, duk_idx_t idx)
 duk_ret_t php_get_function_wrapper(duk_context * ctx)
 {
     char * fnc = "";
-    zval *retval, *func;
-    int catch = 0;
+    zval retval, func;
+    int catch = 0, i = 0;
     int args = duk_get_top(ctx); /* function args */
-
-    MAKE_STD_ZVAL(func);
-    MAKE_STD_ZVAL(retval);
-
-
+	zval params[args];
+	for(i = 0; i < args; i++) {
+		zval val;
+		//php_printf("Args No %i\n\tDUCK_TYPE IS %u\n",i,duk_get_type(ctx, i));
+		duk_to_zval(&val, ctx, i);
+		//php_printf("\tZEND_TYPE IS %u\n",Z_TYPE_P(val));
+		params[i] = val;
+	}
+    
     /* get function name (it's a __function property) */
     duk_push_current_function(ctx);
-    duk_get_prop_string(ctx, -1, "__function");
+	duk_get_prop_string(ctx, -1, "__function");
     duk_to_zval(&func, ctx, -1);
     duk_pop(ctx);
-    /* we got already the function name */
+
+	/* we got already the function name */
+	php_printf("func = %s\n", Z_STRVAL_P(&func));
 
     TSRMLS_FETCH();
-    if(call_user_function(CG(function_table), NULL, func, retval, 0, NULL TSRMLS_CC) != SUCCESS) {
-        duk_push_error_object(ctx, DUK_ERR_ERROR, "Unknown PHP function: \"%s\"", Z_STRVAL_P(func));
-        duk_throw(ctx);
+	
+    if(call_user_function_ex(NULL, NULL, &func, &retval, args, params, 0, NULL) != SUCCESS) {
+		duk_push_error_object(ctx, DUK_ERR_ERROR, "Unknown PHP function: \"%s\"", Z_STRVAL_P(&func));
+		duk_throw(ctx);
     }
-
+	
     if (EG(exception) != NULL) {
         catch = 1;
-        /* There was an exception in the PHP side, let's catch it and throw as a JS exception */
+        // There was an exception in the PHP side, let's catch it and throw as a JS exception
         duk_push_string(ctx, Z_EXCEPTION_PROP("message"));
         zend_clear_exception(TSRMLS_C);
     }
 
-    zval_ptr_dtor(&func);
+    //zval_ptr_dtor(func);
     zval_ptr_dtor(&retval);
 
     if (catch) duk_throw(ctx);
@@ -275,16 +271,16 @@ duk_ret_t php_get_function_wrapper(duk_context * ctx)
 
 duk_ret_t duk_set_into_php(duk_context * ctx)
 {
-    zval * value;
+    zval value;
     char * name;
-
-    MAKE_STD_ZVAL(value);
+	//zend_string *zname;
+    //MAKE_STD_ZVAL(value);
     duk_to_zval(&value, ctx, 2);
 
     name = estrdup(duk_get_string(ctx, 1) + 1);
-
+	//ZVAL_STRING(zname, name);
     TSRMLS_FETCH();
-    zend_hash_add(EG(active_symbol_table), name, strlen(name)+1, &value, sizeof(zval*), NULL);
+    zend_hash_str_add(&EG(regular_list), name, sizeof(name) - 1, &value);
     duk_push_true(ctx);
 
     return 1;
@@ -294,23 +290,23 @@ duk_ret_t duk_set_into_php(duk_context * ctx)
 duk_ret_t duk_get_from_php(duk_context * ctx)
 {
     int args = duk_get_top(ctx);
-    char * name = duk_get_string(ctx, 1);
+    const char *name = duk_get_string(ctx, 1);
 
     if (name[0] == '$') {
-        zval ** value;
-        TSRMLS_FETCH();
-        if(zend_hash_find(EG(active_symbol_table), name+1, strlen(name), (void **) &value) == SUCCESS) {
-            zval_to_duk(ctx, NULL, *value);
+		zval * value;
+		TSRMLS_FETCH();
+        if((value = zend_hash_str_find(&EG(regular_list), name, sizeof(name) - 1)) != NULL) {
+            zval_to_duk(ctx, NULL, value);
         } else {
-            duk_push_undefined(ctx);
+			duk_push_undefined(ctx);
         }
     } else {
         // they expect a function wrapper
         duk_push_c_function(ctx, php_get_function_wrapper, DUK_VARARGS);
+		//duk_push_c_function(ctx, duk_php_print, DUK_VARARGS);
         duk_push_string(ctx, name);
         duk_put_prop_string(ctx, -2, "__function");
     }
-
 
     return 1;
 }
