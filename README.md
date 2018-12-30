@@ -6,8 +6,8 @@ Why?
 ----
 
 1. It's fun!
-2. Javascript is becoming mainstream, with hundreds of libraries. Having an easy way of sharing code with Javascript natively makes using
-3. 
+2. Javascript is becoming mainstream, with hundreds of libraries. Having an easy way of sharing code with Javascript natively makes using them a lot more exciting
+3. All the tests pass
 
 How to install it?
 ------------------
