@@ -8,7 +8,7 @@ function global_() {
 $js = new JS;
 $ret = $js->evaluate(<<<EOF
 try {
-    \$PHP.global_();
+    PHP.global_();
     print("This block of code won't be executed");
 } catch (e) {
     print("expected exception: " + e);

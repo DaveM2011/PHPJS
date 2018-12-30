@@ -1,0 +1,16 @@
+{
+    "files.associations": {
+        "*.view": "php",
+        "xtr1common": "c",
+        "type_traits": "c",
+        "utility": "c",
+        "xmemory0": "c",
+        "xutility": "c",
+        "php_phpjs.h": "c",
+        "duktape.h": "c",
+        "config.h": "c",
+        "zend_operators.h": "c",
+        "xstring": "c",
+        "exception": "c"
+    }
+}

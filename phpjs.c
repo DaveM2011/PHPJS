@@ -5,6 +5,33 @@
 #include "duktape.h"
 #include "php_phpjs.h"
 
+static HashTable *intern_hash = NULL;
+
+HashTable *getht() {
+    if (intern_hash == NULL) {
+        ALLOC_HASHTABLE(intern_hash);
+        zend_hash_init(intern_hash, 0, NULL, ZVAL_PTR_DTOR, 0);
+    }
+    return intern_hash;
+}
+
+static void dump_object(duk_context *ctx, duk_idx_t idx) {
+	idx = duk_require_normalize_index(ctx, idx);
+
+	/* The weird fn() helper is to handle lightfunc name printing (= avoid it). */
+	duk_eval_string(ctx,
+	    "(function (o) {\n"
+	    "    Object.getOwnPropertyNames(o).forEach(function (k) {\n"
+	    "        var pd = Object.getOwnPropertyDescriptor(o, k);\n"
+	    "        function fn(x) { if (x.name !== 'getter' && x.name !== 'setter') { return 'func' }; return x.name; }\n"
+	    "        print(Duktape.enc('jx', k), Duktape.enc('jx', pd), (pd.get ? fn(pd.get) : 'no-getter'), (pd.set ? fn(pd.set) : 'no-setter'));\n"
+	    "    });\n"
+	    "})");
+	duk_dup(ctx, idx);
+	duk_call(ctx, 1);
+	duk_pop(ctx);
+}
+
 duk_ret_t duk_php_print(duk_context * ctx)
 {
     int args = duk_get_top(ctx);
@@ -22,58 +49,184 @@ duk_ret_t duk_php_print(duk_context * ctx)
     return 1;
 }
 
+duk_ret_t myobject_constructor(duk_context *ctx) {
+    /* Stack at entry is: [ name ] */
+
+    /* All Duktape/C functions can be called both as constructors
+     * ("new func()") and functions ("func()").  Sometimes objects
+     * allow both calls, sometimes not.  Here we reject a normal
+     * non-constructor call.
+     */
+    if (!duk_is_constructor_call(ctx)) {
+        return DUK_RET_TYPE_ERROR;
+    }
+
+    /* Get access to the default instance. */
+    duk_push_this(ctx);  /* -> stack: [ name this ] */
+
+    /* Set this.name to name. */
+    duk_dup(ctx, 0);  /* -> stack: [ name this name ] */
+    duk_put_prop_string(ctx, -2, "name");  /* -> stack: [ name this ] */
+
+    /* Return undefined: default instance will be used. */
+    return 0;
+}
+
+
 void duk_php_init(duk_context * ctx)
 {
     duk_push_global_object(ctx);
     duk_push_c_function(ctx, duk_php_print, DUK_VARARGS);
     duk_put_prop_string(ctx, -2, "print");
-    //duk_pop(ctx);
 
-    //duk_push_global_object(ctx);
     duk_push_c_function(ctx, duk_set_into_php, DUK_VARARGS);
     duk_put_prop_string(ctx, -2, "__set_into_php");
-    //duk_pop(ctx);
-
-    //duk_push_global_object(ctx);
     duk_push_c_function(ctx, duk_get_from_php, DUK_VARARGS);
     duk_put_prop_string(ctx, -2, "__get_from_php");
     duk_pop(ctx);
+    //duk_dump_context(ctx);
 
-    duk_push_string(ctx, "var PHP=new Proxy({},{set:__set_into_php,get:__get_from_php});");
+    /*duk_get_prop_string(ctx, -1, "Proxy");
+    duk_push_object(ctx);
+    duk_push_object(ctx);
+    duk_push_c_lightfunc(ctx, duk_set_into_php, 1, 1, 0);
+    duk_put_prop_string(ctx, -2, "set");
+    duk_push_c_lightfunc(ctx, duk_get_from_php, 1, 1, 0);
+    duk_put_prop_string(ctx, -2, "get");
+    duk_new(ctx, 2);
+    duk_put_prop_string(ctx, -2, "PHP");
+    //duk_put_global_string(ctx, "PHP");
+    //duk_push_c_function(ctx, myobject_constructor, 1);
+    dump_object(ctx, -1);*/
+
+
+    /* Push MyObject.prototype object. */
+    //duk_push_object(ctx);  /* -> stack: [ MyObject proto ] */
+
+    /* Set MyObject.prototype.printName. */
+    //duk_push_c_function(ctx, duk_php_print, 0 /*nargs*/);
+    //duk_put_prop_string(ctx, -2, "print");
+
+    /* Set MyObject.prototype = proto */
+    //duk_put_prop_string(ctx, -2, "prototype");  /* -> stack: [ MyObject ] */
+
+    /*duk_push_c_function(ctx, duk_get_from_php, DUK_VARARGS);
+    duk_push_string(ctx, "name");
+    duk_push_string(ctx, "getter");
+    duk_def_prop(ctx, -3, DUK_DEFPROP_HAVE_VALUE);
+    duk_push_c_function(ctx, duk_set_into_php, DUK_VARARGS);
+    duk_push_string(ctx, "name");
+    duk_push_string(ctx, "setter");
+    duk_def_prop(ctx, -3, DUK_DEFPROP_HAVE_VALUE);*/
+    //duk_dump_context(ctx);
+
+    //duk_def_prop(ctx, -4, DUK_DEFPROP_HAVE_CONFIGURABLE | DUK_DEFPROP_CONFIGURABLE |
+    //    DUK_DEFPROP_HAVE_GETTER | DUK_DEFPROP_HAVE_SETTER);
+
+    /* Finally, register MyObject to the global object */
+    //duk_put_global_string(ctx, "PHP");
+    
+    //duk_pop(ctx);
+    //duk_dump_context(ctx);
+    //duk_push_global_object(ctx);
+    //duk_push_c_function(ctx, duk_set_into_php, DUK_VARARGS);
+    //duk_put_prop_string(ctx, -2, "__set_into_php");
+    //duk_pop(ctx);
+    //duk_dump_context(ctx);
+    //duk_push_global_object(ctx);
+    //duk_push_c_function(ctx, duk_get_from_php, DUK_VARARGS);
+    //duk_put_prop_string(ctx, -2, "__get_from_php");
+    //duk_dump_context(ctx);
+    //duk_dump_context(ctx);
+    //duk_pop(ctx);
+    //duk_push_global_object(ctx);
+    //duk_dump_context(ctx);
+
+    //duk_push_object(ctx);
+    //duk_push_string(ctx, "PHP");
+    //duk_push_c_function(ctx, duk_get_from_php, DUK_VARARGS);
+    //duk_push_c_function(ctx, duk_set_into_php, DUK_VARARGS);
+    //duk_def_prop(ctx, -3, DUK_DEFPROP_HAVE_GETTER |
+    //         DUK_DEFPROP_HAVE_SETTER |
+    //         DUK_DEFPROP_HAVE_CONFIGURABLE |
+    //         DUK_DEFPROP_HAVE_ENUMERABLE | DUK_DEFPROP_ENUMERABLE);
+    //duk_dump_context(ctx);
+    //duk_put_global_string(ctx, "PHP");
+
+    duk_push_string(ctx, "var PHP=new Proxy({},{set:__set_into_php,get:__get_from_php})");
 
     if (duk_peval(ctx) != 0) {
-        printf("eval failed: %s\n", duk_safe_to_string(ctx, -1));
+        php_printf("eval failed: %s\n", duk_safe_to_string(ctx, -1));
     }
-    duk_pop(ctx);
+    //duk_pop(ctx);
 
+    //duk_memory_functions mem;
+    //duk_get_memory_functions(ctx, &mem);
+    //zval *main_obj = (zval *)mem.udata;
+    //debug_print("duk_php_init %d, %d\n", main_obj, Z_REFCOUNTED_P(main_obj));
 }
 
 void duk_php_throw(duk_context * ctx, duk_idx_t idx TSRMLS_DC)
 {
     char * js_stack, * message;
-    zval * tc_ex;
-    //MAKE_STD_ZVAL(tc_ex);
-    object_init_ex(tc_ex, phpjs_JSException_ptr);
+    zval tc_ex;
 
+    if (object_init_ex(&tc_ex, phpjs_JSException_ptr) != SUCCESS) {
+        return;
+    }
 
     duk_get_prop_string(ctx, idx, "stack");
     js_stack = estrdup(duk_safe_to_string(ctx, -1));
-    duk_pop(ctx); 
+    duk_pop(ctx);
 
     message = estrdup(duk_safe_to_string(ctx, idx));
-    duk_pop(ctx); 
+    duk_pop(ctx);
 
-    SET_PROP(tc_ex, phpjs_JSException_ptr, "message", message);
-    SET_PROP(tc_ex, phpjs_JSException_ptr, "js_stack", js_stack);
+    //debug_print("duk_php_throw %s\n", message);
 
-    zend_throw_exception_object(tc_ex TSRMLS_CC);
+    SET_PROP(&tc_ex, phpjs_JSException_ptr, "message", message);
+    SET_PROP(&tc_ex, phpjs_JSException_ptr, "js_stack", js_stack);
 
+    zend_throw_exception_object(&tc_ex TSRMLS_CC);
+    
     efree(js_stack);
     efree(message);
 }
 
+duk_idx_t duk_push_php_array_or_object(duk_context * ctx, HashTable * myht)
+{
+    zend_string *str_index;
+    zend_ulong str_length;
+    zend_ulong num_index;
+
+	ZEND_HASH_FOREACH_KEY(myht, num_index, str_index)
+		if (str_index) { //HASH_KEY_IS_STRING
+			return duk_push_object(ctx);
+		}
+	ZEND_HASH_FOREACH_END();
+    
+    return duk_push_array(ctx);
+}
+
+static int duk_is_php_object(duk_context * ctx, duk_idx_t idx)
+{
+    if (duk_is_array(ctx, idx)) {
+        return 0;
+    }
+
+    int cmp;
+
+    duk_get_prop_string(ctx, idx, "constructor");
+    duk_get_prop_string(ctx, -1, "name");
+    cmp = strcmp("Object", duk_safe_to_string(ctx, -1));
+    duk_pop_2(ctx);
+
+    return cmp != 0;
+}
+
 void zval_to_duk(duk_context * ctx, char * name, zval * value)
 {
+    //debug_print("zval_to_duk type: %d\n", Z_TYPE_P(value));
     switch (Z_TYPE_P(value)) {
     case IS_ARRAY: {
         zval * data;
@@ -126,42 +279,12 @@ void zval_to_duk(duk_context * ctx, char * name, zval * value)
     }
 }
 
-duk_idx_t duk_push_php_array_or_object(duk_context * ctx, HashTable * myht)
-{
-    zend_string *str_index;
-    zend_ulong str_length;
-    zend_ulong num_index;
-
-	ZEND_HASH_FOREACH_KEY(myht, num_index, str_index)
-		if (str_index) { //HASH_KEY_IS_STRING
-			return duk_push_object(ctx);
-		}
-	ZEND_HASH_FOREACH_END();
-    
-    return duk_push_array(ctx);
-}
-
-static int duk_is_php_object(duk_context * ctx, duk_idx_t idx)
-{
-    if (duk_is_array(ctx, idx)) {
-        return 0;
-    }
-
-    int cmp;
-
-    duk_get_prop_string(ctx, idx, "constructor");
-    duk_get_prop_string(ctx, -1, "name");
-    cmp = strcmp("Object", duk_safe_to_string(ctx, -1));
-    duk_pop_2(ctx);
-
-    return cmp != 0;
-}
-
 void duk_to_zval(zval * var, duk_context * ctx, duk_idx_t idx)
 {
     duk_size_t len;
     const char * str;
-
+    
+    //debug_print("duk_to_zval type: %d\n", duk_get_type(ctx, idx));
     switch (duk_get_type(ctx, idx)) {
     case DUK_TYPE_UNDEFINED:
     case DUK_TYPE_NULL:
@@ -219,7 +342,7 @@ void duk_to_zval(zval * var, duk_context * ctx, duk_idx_t idx)
 
     case DUK_TYPE_STRING:
         str = duk_get_lstring(ctx, idx, &len);
-		ZVAL_STRINGL(var, str, len);
+        ZVAL_STRINGL(var, str, len);
         break;
     }
 }
@@ -230,12 +353,15 @@ duk_ret_t php_get_function_wrapper(duk_context * ctx)
     zval retval, func;
     int catch = 0, i = 0;
     int args = duk_get_top(ctx); /* function args */
-	zval params[args];
+	char *error;
+    int check_flags = 0;
+    
+    zval params[args];
 	for(i = 0; i < args; i++) {
 		zval val;
-		//php_printf("Args No %i\n\tDUCK_TYPE IS %u\n",i,duk_get_type(ctx, i));
+		//debug_print("Args No %i\n\tDUCK_TYPE IS %u\n",i,duk_get_type(ctx, i));
 		duk_to_zval(&val, ctx, i);
-		//php_printf("\tZEND_TYPE IS %u\n",Z_TYPE_P(val));
+		//debug_print("\tZEND_TYPE IS %u\n",Z_TYPE_P(val));
 		params[i] = val;
 	}
     
@@ -246,56 +372,88 @@ duk_ret_t php_get_function_wrapper(duk_context * ctx)
     duk_pop(ctx);
 
 	/* we got already the function name */
-	php_printf("func = %s\n", Z_STRVAL_P(&func));
-
     TSRMLS_FETCH();
 	
     if(call_user_function_ex(NULL, NULL, &func, &retval, args, params, 0, NULL) != SUCCESS) {
 		duk_push_error_object(ctx, DUK_ERR_ERROR, "Unknown PHP function: \"%s\"", Z_STRVAL_P(&func));
 		duk_throw(ctx);
     }
-	
     if (EG(exception) != NULL) {
         catch = 1;
+        
+        zval tmp, *msg, rv;
+        ZVAL_OBJ(&tmp, EG(exception));
+        msg = zend_read_property(zend_ce_exception, &tmp, "message", sizeof("message")-1, 0, &rv);
+        duk_push_string(ctx, Z_STRVAL_P(msg));
+
+        zval_ptr_dtor(&tmp);
+        EG(exception) = NULL;
+
         // There was an exception in the PHP side, let's catch it and throw as a JS exception
-        duk_push_string(ctx, Z_EXCEPTION_PROP("message"));
+        //duk_push_string(ctx, err/*Z_EXCEPTION_PROP("message")*/);
         zend_clear_exception(TSRMLS_C);
     }
 
-    //zval_ptr_dtor(func);
+    zval_ptr_dtor(&func);
     zval_ptr_dtor(&retval);
-
+    
     if (catch) duk_throw(ctx);
     return 1;
 }
 
 duk_ret_t duk_set_into_php(duk_context * ctx)
 {
+    //duk_dump_context(ctx);
     zval value;
-    char * name;
+    duk_size_t namelen;
+    const char *name = estrdup(duk_get_lstring(ctx, 1, &namelen) + 1);
+    //debug_print("duk_set_into_php: %s\n", name);
 	//zend_string *zname;
     //MAKE_STD_ZVAL(value);
     duk_to_zval(&value, ctx, 2);
-
-    name = estrdup(duk_get_string(ctx, 1) + 1);
-	//ZVAL_STRING(zname, name);
+    //php_var_dump(&value, 0 TSRMLS_CC);
+    
     TSRMLS_FETCH();
-    zend_hash_str_add(&EG(regular_list), name, sizeof(name) - 1, &value);
+    //zend_hash_str_add(&EG(regular_list), name, namelen, &value);
+    zend_hash_str_add(getht(), name, namelen - 1, &value);
+    //zend_hash_str_add_empty_element(&EG(regular_list), name, namelen);
+    //zend_hash_str_add_empty_element(getht(), name, namelen);
+
     duk_push_true(ctx);
+
+    //debug_print("duk_set_into_php: %s, %d, %d\n", name, sizeof(name) - 1, &EG(regular_list));
+    //php_debug_zval_dump(&value, 0);
 
     return 1;
 }
 
-
 duk_ret_t duk_get_from_php(duk_context * ctx)
 {
+    duk_size_t len;
     int args = duk_get_top(ctx);
-    const char *name = duk_get_string(ctx, 1);
-
+    const char *name = duk_get_lstring(ctx, 1, &len);
+    //debug_print("duk_get_from_php: %s, isvar %d\n", name, name[0] == '$');
     if (name[0] == '$') {
+        name++;
+        len--;
 		zval * value;
 		TSRMLS_FETCH();
-        if((value = zend_hash_str_find(&EG(regular_list), name, sizeof(name) - 1)) != NULL) {
+
+        /*zend_long lkey;
+        zend_string *skey;
+        zval *val;
+        ZEND_HASH_FOREACH_KEY_VAL(getht(), lkey, skey, val) {
+            if (skey) { // string key
+                debug_print("%s => ", ZSTR_VAL(skey));
+            } else { // long key
+                debug_print("%d => ", lkey);
+            }
+            php_debug_zval_dump(val, 0);
+        } ZEND_HASH_FOREACH_END();*/
+
+        //debug_print("duk_get_from_php: find %s, %d\n", name, len);
+        if((value = zend_hash_str_find(getht(), name, len)) != NULL) {
+            //debug_print("duk_get_from_php: found %s\n", name);
             zval_to_duk(ctx, NULL, value);
         } else {
 			duk_push_undefined(ctx);
@@ -310,4 +468,3 @@ duk_ret_t duk_get_from_php(duk_context * ctx)
 
     return 1;
 }
-

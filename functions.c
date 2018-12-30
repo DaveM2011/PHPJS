@@ -11,10 +11,8 @@ PHPAPI zend_object_handlers phpjs_JSFunctionWrapper_handlers;
 static zend_object* phpjs_function_new(zend_class_entry * ce TSRMLS_DC)
 {
     //zend_object_value retval;
-    phpjs_wrap_duk_t * obj;
-
-    obj = (phpjs_wrap_duk_t *) emalloc(sizeof(phpjs_wrap_duk_t));
-    memset(obj, 0, sizeof(phpjs_wrap_duk_t));
+    phpjs_wrap_duk_t * obj = (phpjs_wrap_duk_t *) emalloc(sizeof(phpjs_wrap_duk_t));
+    //memset(obj, 0, sizeof(phpjs_wrap_duk_t));
     zend_object_std_init(&obj->zobj, ce TSRMLS_CC);
 
     object_properties_init(&obj->zobj, ce);
@@ -26,7 +24,7 @@ static zend_object* phpjs_function_new(zend_class_entry * ce TSRMLS_DC)
 ZEND_METHOD(JSFunctionWrapper, __invoke)
 {
     int argc = 0;
-    FETCH_THIS_WRAPPER
+    FETCH_THIS_WRAPPER(getThis());
 
     duk_dup(ctx, obj->idx);
     if (duk_pcall(ctx, argc) != 0) {

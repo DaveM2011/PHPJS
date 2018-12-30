@@ -8,7 +8,7 @@ kljdalksjda();
 EOF
 );
 --EXPECTF--
-Fatal error: Uncaught exception 'JSException' with message 'ReferenceError: identifier 'kljdalksjda' undefined' in %s:%d
+Fatal error: Uncaught JSException: ReferenceError: identifier 'kljdalksjda' undefined in %s:%d
 Stack trace:
 #0 %s(%d): JS->evaluate('kljdalksjda();')
 #1 {main}

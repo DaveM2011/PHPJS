@@ -5,10 +5,9 @@ Convert not found functions in Javascript as an PHP exception
 $js = new JS;
 $js->foobar();
 --EXPECTF--
-Fatal error: Uncaught exception 'JSException' with message 'foobar() is not a javascript function' in %s:%d
+Fatal error: Uncaught JSException: foobar() is not a javascript function in %s:%d
 Stack trace:
 #0 %s(%d): JS->__call('foobar', Array)
-#1 %s(%d): JS->foobar()
-#2 {main}
+#1 {main}
   thrown in %s on line %d
 

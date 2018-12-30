@@ -8,18 +8,30 @@
 #include <ext/standard/info.h>
 #include <ext/standard/file.h>
 #include <main/php_streams.h>
+#include <Zend/zend.h>
 #include <Zend/zend_API.h>
 #include <Zend/zend_exceptions.h>
 #include <Zend/zend_interfaces.h>
 #include <Zend/zend_inheritance.h>
+#include <Zend/zend_constants.h>
+#include <Zend/zend_operators.h>
+#include <Zend/zend_globals_macros.h>
+#include <Zend/zend_smart_str.h>
 
-//#define IS_BOOL(zval) ((Z_TYPE(zval) == IS_FALSE) || (Z_TYPE(zval) == IS_TRUE))
 #define IS_BOOL IS_FALSE | IS_TRUE
 
 #define _S(str) str, sizeof(str) - 1
 
 extern zend_module_entry phpjs_module_entry;
 #define phpext_phpjs_ptr &phpjs_module_entry
+
+typedef struct
+{
+    duk_context *ctx;
+    zval * vm;
+    zend_object zobj;
+    //HashTable *ht;
+} php_js_t;
 
 typedef struct {
     duk_context * ctx;
@@ -49,12 +61,11 @@ extern int zval_array_to_stack(duk_context * ctx, zval * a_args);
 extern void phpjs_php__call(duk_context * ctx, char * fnc, zval * a_args, zval * return_value TSRMLS_DC);
 void duk_php_init(duk_context * ctx);
 void duk_php_throw(duk_context * ctx, duk_idx_t idx TSRMLS_DC);
+HashTable *getht();
 
 #define php_duk_free_return(ctx) duk_pop(ctx); 
 
 END_EXTERN_C()
-
-#define Z_EXCEPTION_PROP(x) Z_STRVAL_P(zend_read_property(zend_exception_get_default(TSRMLS_C), &EG(error_zval), x, sizeof(x)-1, 0, NULL TSRMLS_CC))
 
 /*#define FETCH_THIS_WRAPPER \
 	zval* object = getThis(); \
@@ -65,29 +76,18 @@ END_EXTERN_C()
     }   \
     duk_context * ctx = obj->ctx;*/
 
-#define FETCH_THIS_WRAPPER phpjs_wrap_duk_t* obj = (phpjs_wrap_duk_t *)((char *)getThis() - XtOffsetOf(phpjs_wrap_duk_t, zobj)); \
-	duk_context *ctx = obj->ctx;
-
-#define FETCH_THIS_EX(validate) \
-    zval* object = getThis(); \
-	php_js_t*  obj = NULL; \
-	obj = (php_js_t *)((char*)object - XtOffsetOf(php_js_t, zobj)); \
-	if (!obj || (validate && (!instanceof_function(Z_OBJCE_P(object), phpjs_JS_ptr TSRMLS_CC) || obj->ctx == NULL))) { \
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unexpected error. This method cannot be called statically"); \
-		return; \
-	} \
-	duk_context *ctx = obj->ctx;
-
-#define FETCH_THIS php_js_t* obj = Z_PHP_JS_OBJ_P(getThis()); \
+#define FETCH_THIS_WRAPPER(this) phpjs_wrap_duk_t* obj = (phpjs_wrap_duk_t *)((char *)Z_OBJ_P(this) - XtOffsetOf(phpjs_wrap_duk_t, zobj)); \
 	duk_context *ctx = obj->ctx;
 
 #define SET_PROP(var, t, n, v)  zend_update_property_string(t, var, n, sizeof(n)-1, v TSRMLS_CC);
 
 #define THROW_EXCEPTION(message) do { \
-    zval * tc_ex; \
-    object_init_ex(tc_ex, phpjs_JSException_ptr); \
-    SET_PROP(tc_ex, phpjs_JSException_ptr, "message", message); \
-    zend_throw_exception_object(tc_ex TSRMLS_CC); \
-} while (0); \
+    zval tc_ex; \
+    object_init_ex(&tc_ex, phpjs_JSException_ptr); \
+    SET_PROP(&tc_ex, phpjs_JSException_ptr, "message", message); \
+    zend_throw_exception_object(&tc_ex TSRMLS_CC); \
+} while (0);
+
+#define PHPJS_GET_OBJECT(entry, z) (entry *)(entry *)((char *)Z_OBJ_P(z) - XtOffsetOf(entry, zobj))
 
 #endif

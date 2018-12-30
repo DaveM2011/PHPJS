@@ -31,7 +31,7 @@ $ret = $js->evaluate(<<<EOF
 EOF
 );
 
-// set some variables 
+// set some variables
 // on the JS global scope
 $js['zbool'] = true;
 $js['zint']  = 99;
@@ -49,12 +49,12 @@ ob_get_clean();
 $js->cesar();
 
 // read variable that was inject from JS
-var_dump($foo);
-var_dump($obj_js);
+var_dump($js->foo);
+var_dump($js->obj_js);
 
 ?>
 --EXPECT--
-{"0":1,"1":2,"2":3,"3":4,"4":5,"cesar":7,"5":[1,2,3]}
+{"0":1,"1":2,"2":3,"3":4,"4":5,"5":[1,2,3],"cesar":7}
 true 99
 true
 hola
