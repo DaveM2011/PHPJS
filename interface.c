@@ -23,23 +23,13 @@ static inline php_js_t *php_js_fetch_object(zend_object *obj)
 
 #define Z_PHP_JS_OBJ_P(zv) (php_js_t *)((char *)Z_OBJ_P(zv) - XtOffsetOf(php_js_t, zobj));
 
-#define FETCH_THIS_EX(validate) \
-    zval* object = getThis(); \
-	php_js_t*  obj = NULL; \
-	obj = (php_js_t *)((char*)object - XtOffsetOf(php_js_t, zobj)); \
-	if (!obj || (validate && (!instanceof_function(Z_OBJCE_P(object), phpjs_JS_ptr TSRMLS_CC) || obj->ctx == NULL))) { \
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unexpected error. This method cannot be called statically"); \
-		return; \
-	} \
-	duk_context *ctx = obj->ctx;
-
 #define FETCH_THIS php_js_t* obj = Z_PHP_JS_OBJ_P(getThis()); \
 	duk_context *ctx = obj->ctx;
 
 // public function __construct()
 ZEND_METHOD(JS, __construct)
 {
-    php_js_t *obj = php_js_fetch_object(Z_OBJ_P(getThis()));
+    FETCH_THIS;
 
     TSRMLS_FETCH();
     zend_hash_str_add(getht(), "main_obj", 8, getThis());
@@ -69,7 +59,7 @@ ZEND_METHOD(JS, evaluate)
     duk_pop(ctx);
 }
 
-// public function evaluate($file)
+// public function load($file)
 ZEND_METHOD(JS, load)
 {
     FETCH_THIS;
@@ -102,7 +92,7 @@ ZEND_METHOD(JS, load)
     {
         if (duk_peval_lstring(ctx, ZSTR_VAL(contents), ZSTR_LEN(contents)) != 0)
         {
-            php_printf("compile failed: %s\n", duk_safe_to_string(ctx, -1));
+            duk_php_throw(ctx, -1 TSRMLS_CC);
             RETURN_FALSE;
         }
         duk_to_zval(return_value, ctx, -1);
@@ -185,6 +175,7 @@ ZEND_METHOD(JS, __set)
     zval_to_duk(ctx, name, a_value);
 }
 
+// public function offsetSet($name, $value)
 ZEND_METHOD(JS, offsetSet)
 {
     FETCH_THIS;
