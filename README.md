@@ -1,7 +1,5 @@
 # PHPJS
 
-***This is super experimental***
-
 Run javascript inside PHP, powered by the awesome [Duktape](http://duktape.org) Javascript engine.
 
 Why?

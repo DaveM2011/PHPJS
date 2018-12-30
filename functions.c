@@ -10,13 +10,9 @@ PHPAPI zend_object_handlers phpjs_JSFunctionWrapper_handlers;
 
 static zend_object* phpjs_function_new(zend_class_entry * ce TSRMLS_DC)
 {
-    //zend_object_value retval;
     phpjs_wrap_duk_t * obj = (phpjs_wrap_duk_t *) emalloc(sizeof(phpjs_wrap_duk_t));
-    //memset(obj, 0, sizeof(phpjs_wrap_duk_t));
     zend_object_std_init(&obj->zobj, ce TSRMLS_CC);
-
     object_properties_init(&obj->zobj, ce);
-
     obj->zobj.handlers = &phpjs_JSFunctionWrapper_handlers;
     return &obj->zobj;
 }

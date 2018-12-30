@@ -47,8 +47,6 @@ ZEND_METHOD(JS, __construct)
     obj->vm = getThis();
     obj->ctx = duk_create_heap(NULL, NULL, NULL, NULL, duk_fatal_handler);
     duk_php_init(obj->ctx);
-    
-    //debug_print("JS::__construct ptr: %d, ref: %d\n", obj->vm, Z_REFCOUNTED_P(obj->vm) ? Z_REFCOUNT_P(obj->vm) : 0);
 }
 
 // public function evaluate($string)
@@ -108,7 +106,6 @@ ZEND_METHOD(JS, load)
             RETURN_FALSE;
         }
         duk_to_zval(return_value, ctx, -1);
-        //duk_pop(ctx);
     }
     else
     {
@@ -280,9 +277,7 @@ static zend_function_entry phpjs_functions[] = {
 static void php_js_free_storage(zend_object *object)
 {
     php_js_t *obj = php_js_fetch_object(object);
-    //php_js_t *obj = (php_js_t *)((char *)object - XtOffsetOf(php_js_t, zobj));
-
-    //php_printf("php_js_free_storage %d\n", Z_REFCOUNTED_P(obj->vm) ? Z_REFCOUNT_P(obj->vm) : 0);
+    
     if (obj->ctx)
         duk_destroy_heap(obj->ctx);
     

@@ -159,11 +159,6 @@ void duk_php_init(duk_context * ctx)
         php_printf("eval failed: %s\n", duk_safe_to_string(ctx, -1));
     }
     //duk_pop(ctx);
-
-    //duk_memory_functions mem;
-    //duk_get_memory_functions(ctx, &mem);
-    //zval *main_obj = (zval *)mem.udata;
-    //debug_print("duk_php_init %d, %d\n", main_obj, Z_REFCOUNTED_P(main_obj));
 }
 
 void duk_php_throw(duk_context * ctx, duk_idx_t idx TSRMLS_DC)
@@ -181,8 +176,6 @@ void duk_php_throw(duk_context * ctx, duk_idx_t idx TSRMLS_DC)
 
     message = estrdup(duk_safe_to_string(ctx, idx));
     duk_pop(ctx);
-
-    //debug_print("duk_php_throw %s\n", message);
 
     SET_PROP(&tc_ex, phpjs_JSException_ptr, "message", message);
     SET_PROP(&tc_ex, phpjs_JSException_ptr, "js_stack", js_stack);
@@ -226,7 +219,6 @@ static int duk_is_php_object(duk_context * ctx, duk_idx_t idx)
 
 void zval_to_duk(duk_context * ctx, char * name, zval * value)
 {
-    //debug_print("zval_to_duk type: %d\n", Z_TYPE_P(value));
     switch (Z_TYPE_P(value)) {
     case IS_ARRAY: {
         zval * data;
@@ -284,7 +276,6 @@ void duk_to_zval(zval * var, duk_context * ctx, duk_idx_t idx)
     duk_size_t len;
     const char * str;
     
-    //debug_print("duk_to_zval type: %d\n", duk_get_type(ctx, idx));
     switch (duk_get_type(ctx, idx)) {
     case DUK_TYPE_UNDEFINED:
     case DUK_TYPE_NULL:
@@ -313,7 +304,6 @@ void duk_to_zval(zval * var, duk_context * ctx, duk_idx_t idx)
 
         while (duk_next(ctx, idx1, 1 /*get_value*/)) {
             zval value;
-            //MAKE_STD_ZVAL(value);
             duk_to_zval(&value, ctx, -1);
 
             if(duk_get_type(ctx, -2) == DUK_TYPE_NUMBER) {
@@ -359,9 +349,7 @@ duk_ret_t php_get_function_wrapper(duk_context * ctx)
     zval params[args];
 	for(i = 0; i < args; i++) {
 		zval val;
-		//debug_print("Args No %i\n\tDUCK_TYPE IS %u\n",i,duk_get_type(ctx, i));
 		duk_to_zval(&val, ctx, i);
-		//debug_print("\tZEND_TYPE IS %u\n",Z_TYPE_P(val));
 		params[i] = val;
 	}
     
@@ -390,7 +378,6 @@ duk_ret_t php_get_function_wrapper(duk_context * ctx)
         EG(exception) = NULL;
 
         // There was an exception in the PHP side, let's catch it and throw as a JS exception
-        //duk_push_string(ctx, err/*Z_EXCEPTION_PROP("message")*/);
         zend_clear_exception(TSRMLS_C);
     }
 
@@ -403,26 +390,14 @@ duk_ret_t php_get_function_wrapper(duk_context * ctx)
 
 duk_ret_t duk_set_into_php(duk_context * ctx)
 {
-    //duk_dump_context(ctx);
     zval value;
     duk_size_t namelen;
     const char *name = estrdup(duk_get_lstring(ctx, 1, &namelen) + 1);
-    //debug_print("duk_set_into_php: %s\n", name);
-	//zend_string *zname;
-    //MAKE_STD_ZVAL(value);
     duk_to_zval(&value, ctx, 2);
-    //php_var_dump(&value, 0 TSRMLS_CC);
     
     TSRMLS_FETCH();
-    //zend_hash_str_add(&EG(regular_list), name, namelen, &value);
     zend_hash_str_add(getht(), name, namelen - 1, &value);
-    //zend_hash_str_add_empty_element(&EG(regular_list), name, namelen);
-    //zend_hash_str_add_empty_element(getht(), name, namelen);
-
     duk_push_true(ctx);
-
-    //debug_print("duk_set_into_php: %s, %d, %d\n", name, sizeof(name) - 1, &EG(regular_list));
-    //php_debug_zval_dump(&value, 0);
 
     return 1;
 }
@@ -432,28 +407,13 @@ duk_ret_t duk_get_from_php(duk_context * ctx)
     duk_size_t len;
     int args = duk_get_top(ctx);
     const char *name = duk_get_lstring(ctx, 1, &len);
-    //debug_print("duk_get_from_php: %s, isvar %d\n", name, name[0] == '$');
     if (name[0] == '$') {
         name++;
         len--;
 		zval * value;
 		TSRMLS_FETCH();
 
-        /*zend_long lkey;
-        zend_string *skey;
-        zval *val;
-        ZEND_HASH_FOREACH_KEY_VAL(getht(), lkey, skey, val) {
-            if (skey) { // string key
-                debug_print("%s => ", ZSTR_VAL(skey));
-            } else { // long key
-                debug_print("%d => ", lkey);
-            }
-            php_debug_zval_dump(val, 0);
-        } ZEND_HASH_FOREACH_END();*/
-
-        //debug_print("duk_get_from_php: find %s, %d\n", name, len);
         if((value = zend_hash_str_find(getht(), name, len)) != NULL) {
-            //debug_print("duk_get_from_php: found %s\n", name);
             zval_to_duk(ctx, NULL, value);
         } else {
 			duk_push_undefined(ctx);
@@ -461,8 +421,7 @@ duk_ret_t duk_get_from_php(duk_context * ctx)
     } else {
         // they expect a function wrapper
         duk_push_c_function(ctx, php_get_function_wrapper, DUK_VARARGS);
-		//duk_push_c_function(ctx, duk_php_print, DUK_VARARGS);
-        duk_push_string(ctx, name);
+		duk_push_string(ctx, name);
         duk_put_prop_string(ctx, -2, "__function");
     }
 

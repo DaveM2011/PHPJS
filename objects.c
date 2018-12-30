@@ -10,15 +10,9 @@ PHPAPI zend_object_handlers phpjs_JSObjectWrapper_handlers;
 
 static zend_object* phpjs_object_new(zend_class_entry * ce TSRMLS_DC)
 {
-    //zend_object_value retval;
     phpjs_wrap_duk_t *obj = (phpjs_wrap_duk_t *)ecalloc(1, sizeof(phpjs_wrap_duk_t) + zend_object_properties_size(ce));
-    //memset(obj, 0, sizeof(phpjs_wrap_duk_t));
     zend_object_std_init(&obj->zobj, ce TSRMLS_CC);
-
     object_properties_init(&obj->zobj, ce);
-
-    //retval.handle = zend_objects_store_put(obj, (zend_objects_store_dtor_t)zend_objects_destroy_object, (zend_objects_free_object_storage_t)phpjs_wrapped_free, NULL TSRMLS_CC);
-    //retval.handlers = zend_get_std_object_handlers();
 	obj->zobj.handlers = &phpjs_JSObjectWrapper_handlers;
     return &obj->zobj;
 }
@@ -34,7 +28,6 @@ ZEND_METHOD(JSObjectWrapper, __call)
     if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "sz", &fnc, &lfnc, &a_args) == FAILURE)
         return;
     
-    //debug_print("Object::__call(%s)\n", fnc);
     duk_dup(ctx, obj->idx);
     phpjs_php__call(ctx, fnc, a_args, return_value TSRMLS_CC); 
     duk_pop(ctx);
@@ -49,11 +42,8 @@ ZEND_METHOD(JSObjectWrapper, __get)
     if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &varname, &varname_len) == FAILURE)
         return;
     
-    //debug_print("JSObjectWrapper::__get %s, %d, %d, %d\n", varname, obj->idx, ctx, obj->vm);
     duk_dup(ctx, obj->idx);
     duk_get_prop_string(ctx, -1, varname);
-    //debug_print("JSObjectWrapper::__get %s\n", duk_safe_to_string(ctx, -1));
-
     duk_to_zval(return_value, ctx, -1);
     php_duk_free_return(ctx);
 }

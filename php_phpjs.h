@@ -67,15 +67,6 @@ HashTable *getht();
 
 END_EXTERN_C()
 
-/*#define FETCH_THIS_WRAPPER \
-	zval* object = getThis(); \
-    phpjs_wrap_duk_t * obj = (phpjs_wrap_duk_t *) ((char*)object - XtOffsetOf(phpjs_wrap_duk_t, zobj));   \
-    if (!getThis() || obj->ctx == NULL) {    \
-        php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unexpected error. This method cannot be called statically"); \
-        return; \
-    }   \
-    duk_context * ctx = obj->ctx;*/
-
 #define FETCH_THIS_WRAPPER(this) phpjs_wrap_duk_t* obj = (phpjs_wrap_duk_t *)((char *)Z_OBJ_P(this) - XtOffsetOf(phpjs_wrap_duk_t, zobj)); \
 	duk_context *ctx = obj->ctx;
 
